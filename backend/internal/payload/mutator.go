@@ -29,7 +29,6 @@ type MutateOptions struct {
 func Mutate(eps []swagger.Endpoint, opts MutateOptions) []Job {
 	items := Catalog()
 	var jobs []Job
-	var bodyBuf []byte
 	base := strings.TrimRight(opts.BaseURL, "/")
 	for _, ep := range eps {
 		for _, p := range ep.Params {
@@ -37,8 +36,7 @@ func Mutate(eps []swagger.Endpoint, opts MutateOptions) []Job {
 				if !compatible(p, it) {
 					continue
 				}
-				j := apply(base, ep, p, it, bodyBuf)
-				bodyBuf = j.Body
+				j := apply(base, ep, p, it)
 				jobs = append(jobs, j)
 				if opts.MaxJobs > 0 && len(jobs) >= opts.MaxJobs {
 					return jobs
@@ -59,7 +57,7 @@ func compatible(p swagger.Param, it Item) bool {
 	return true
 }
 
-func apply(base string, ep swagger.Endpoint, p swagger.Param, it Item, bodyBuf []byte) Job {
+func apply(base string, ep swagger.Endpoint, p swagger.Param, it Item) Job {
 	path := ep.Path
 	q := url.Values{}
 	headers := map[string]string{"Accept": "application/json, text/html;q=0.8"}
@@ -98,8 +96,7 @@ func apply(base string, ep swagger.Endpoint, p swagger.Param, it Item, bodyBuf [
 
 	var body []byte
 	if len(bodyObj) > 0 {
-		encoded, _ := json.Marshal(bodyObj)
-		body = append(bodyBuf[:0], encoded...)
+		body, _ = json.Marshal(bodyObj)
 		headers["Content-Type"] = "application/json"
 	}
 	u := base + path
