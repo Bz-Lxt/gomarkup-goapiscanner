@@ -40,7 +40,16 @@ func Do(ctx context.Context, client *http.Client, job payload.Job) Result {
 	if err != nil {
 		return Result{Job: job, Err: err, Latency: lat}
 	}
-	body, _ := io.ReadAll(responseReader(resp))
+	// Read the body BEFORE closing it. A previous version returned an
+	// io.LimitReader wrapping resp.Body and closed resp.Body via defer when
+	// returning from responseReader. Because Close() on a real
+	// http.Response.Body invalidates the underlying reader, the caller's
+	// subsequent io.ReadAll saw "http: read on closed body" and returned an
+	// empty slice. That wiped out SQL-error fingerprints and reflected-XSS /
+	// reflection hits which all depend on Result.Body. Read eagerly here so
+	// the body is captured regardless of how the response stream behaves on
+	// close.
+	body, _ := readBody(resp)
 	return Result{
 		Job:        job,
 		StatusCode: resp.StatusCode,
@@ -50,7 +59,10 @@ func Do(ctx context.Context, client *http.Client, job payload.Job) Result {
 	}
 }
 
-func responseReader(resp *http.Response) io.Reader {
+// readBody drains up to 256 KiB of the response body and closes the underlying
+// stream. Reading must happen before Close() to avoid losing the body on
+// transports whose Close() invalidates the reader (e.g. net/http transport).
+func readBody(resp *http.Response) ([]byte, error) {
 	defer resp.Body.Close()
-	return io.LimitReader(resp.Body, 256<<10)
+	return io.ReadAll(io.LimitReader(resp.Body, 256<<10))
 }
