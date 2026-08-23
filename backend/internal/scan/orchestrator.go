@@ -51,6 +51,16 @@ func (o *Orchestrator) Cancel(id string) bool {
 }
 
 func (o *Orchestrator) run(ctx context.Context, task model.Task, spec []byte) {
+	// A panic anywhere in the scan pipeline (e.g. a malformed OpenAPI doc that
+	// trips a nil deref in the parser) would otherwise crash the whole process
+	// and leave the task stuck in "running" forever. Recover, mark the task as
+	// failed, and keep the engine alive for other scans.
+	defer func() {
+		if r := recover(); r != nil {
+			logger.L().Error("scan panic recovered", "task", task.ID, "panic", fmt.Sprint(r))
+			o.fail(task, "扫描引擎内部异常，请联系管理员")
+		}
+	}()
 	defer o.Guard.Release(task.ID)
 	defer o.Canceller.Drop(task.ID)
 

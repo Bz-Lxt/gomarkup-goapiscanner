@@ -156,10 +156,17 @@ func resolveRef(ref string, doc Document) map[string]any {
 	var raw json.RawMessage
 	switch {
 	case strings.HasPrefix(ref, prefix3):
-		raw = doc.Components.Schemas[strings.TrimPrefix(ref, prefix3)]
+		// doc.Components is a pointer and may be nil when the document
+		// omits the components object entirely but still references it.
+		if doc.Components != nil {
+			raw = doc.Components.Schemas[strings.TrimPrefix(ref, prefix3)]
+		}
 	case strings.HasPrefix(ref, prefix2):
 		raw = doc.Definitions[strings.TrimPrefix(ref, prefix2)]
 	default:
+		return nil
+	}
+	if len(raw) == 0 {
 		return nil
 	}
 	var m map[string]any
