@@ -31,7 +31,8 @@ func FetchSwagger(ctx context.Context, client *http.Client, base string) ([]byte
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 		resp.Body.Close()
 		if resp.StatusCode != 200 {
-			return nil, "", fmt.Errorf("%s -> HTTP %d", u, resp.StatusCode)
+			last = fmt.Errorf("%s -> HTTP %d", u, resp.StatusCode)
+			continue
 		}
 		if !looksLikeSpec(body) {
 			last = fmt.Errorf("%s: not an OpenAPI document", u)
