@@ -1,0 +1,43 @@
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+/bin/
+/dist/
+
+# Go
+backend/vendor/
+**/__debug_bin*
+*.test
+coverage.out
+coverage.html
+
+# Node
+node_modules/
+frontend-user/dist/
+frontend-user/.vite/
+*.local
+
+# Data
+*.db
+*.sqlite
+data/
+tmp/
+.pdf
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Test cache
+.pytest_cache/
+playwright-report/
+test-results/
