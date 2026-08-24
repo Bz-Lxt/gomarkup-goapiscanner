@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
@@ -34,8 +33,10 @@ func NewClient(timeout time.Duration) *http.Client {
 			if len(via) >= 3 {
 				return http.ErrUseLastResponse
 			}
-			redirected := req.WithContext(context.WithoutCancel(req.Context()))
-			*req = *redirected
+			// Keep the request context intact so that cancellation of the
+			// parent context propagates through every redirect hop. Stripping
+			// the cancellation (e.g. context.WithoutCancel) would leave the
+			// final leg's TCP connection alive after the task is cancelled.
 			return nil
 		},
 	}
