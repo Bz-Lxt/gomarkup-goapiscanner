@@ -24,7 +24,6 @@ type Orchestrator struct {
 	Hub       *ws.Hub
 	Guard     *Guard
 	Canceller *Canceller
-	matcher   *fingerprint.Matcher
 }
 
 func NewOrchestrator(cfg config.Config, st *store.Store, hub *ws.Hub) *Orchestrator {
@@ -34,7 +33,6 @@ func NewOrchestrator(cfg config.Config, st *store.Store, hub *ws.Hub) *Orchestra
 		Hub:       hub,
 		Guard:     NewGuard(),
 		Canceller: NewCanceller(),
-		matcher:   fingerprint.New(),
 	}
 }
 
@@ -107,8 +105,7 @@ func (o *Orchestrator) run(ctx context.Context, task model.Task, spec []byte) {
 		timeout = 6 * time.Second
 	}
 	pool := engine.NewPool(task.Concurrency, timeout)
-	matcher := o.matcher
-	matcher.Reset()
+	matcher := fingerprint.New()
 	prog := &Progress{Total: len(jobs)}
 
 	err = pool.Run(ctx, jobs, func(res engine.Result) {
