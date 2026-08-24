@@ -1,0 +1,82 @@
+services:
+  target-lab:
+    build:
+      context: ./target-lab
+      dockerfile: Dockerfile
+    environment:
+      - TZ=Asia/Shanghai
+      - LAB_LISTEN=:8090
+    ports:
+      - "28483:8090"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8090/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 8
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - TZ=Asia/Shanghai
+      - LISTEN=:8080
+      - DATA_DIR=/data
+      - CORS_ORIGIN=http://localhost:28481
+      - LAB_PUBLIC_URL=http://localhost:28483
+      - LAB_INTERNAL_URL=http://target-lab:8090
+      - SCAN_MODE=lab
+      - GOPROXY=https://goproxy.cn,direct
+    volumes:
+      - scanner-data:/data
+    ports:
+      - "28482:8080"
+    depends_on:
+      target-lab:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/v1/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  frontend-user:
+    build:
+      context: ./frontend-user
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE=
+    ports:
+      - "28481:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 3s
+      retries: 8
+
+  qa:
+    profiles: ["qa"]
+    image: python:3.12-alpine
+    working_dir: /tests
+    environment:
+      - TZ=Asia/Shanghai
+      - PYTHONIOENCODING=utf-8
+      - API_BASE=http://backend:8080
+      - LAB_BASE=http://target-lab:8090
+      - WEB_BASE=http://frontend-user
+    volumes:
+      - ./tests:/tests:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend-user:
+        condition: service_healthy
+      target-lab:
+        condition: service_healthy
+    entrypoint: ["sh", "-c", "pip install -q pytest && pytest -p no:cacheprovider -q api_smoke.py"]
+
+volumes:
+  scanner-data:
