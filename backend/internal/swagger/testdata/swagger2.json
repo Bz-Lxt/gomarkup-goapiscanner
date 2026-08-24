@@ -1,0 +1,18 @@
+{
+  "swagger": "2.0",
+  "basePath": "/v1",
+  "paths": {
+    "/echo": {
+      "get": {
+        "parameters": [
+          {"name": "msg", "in": "query", "type": "string"}
+        ]
+      },
+      "post": {
+        "parameters": [
+          {"name": "body", "in": "body", "schema": {"type": "object"}}
+        ]
+      }
+    }
+  }
+}
