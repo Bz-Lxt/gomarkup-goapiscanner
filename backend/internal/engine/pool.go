@@ -35,8 +35,6 @@ func (p *Pool) Run(ctx context.Context, jobs []payload.Job, onResult func(Result
 	}
 	var wg sync.WaitGroup
 	errCh := make(chan error, 1)
-	timingCtx, cancelTiming := context.WithTimeout(ctx, p.client.Timeout)
-	defer cancelTiming()
 
 	for _, job := range jobs {
 		if err := p.sem.Acquire(ctx); err != nil {
@@ -48,14 +46,16 @@ func (p *Pool) Run(ctx context.Context, jobs []payload.Job, onResult func(Result
 		go func() {
 			defer wg.Done()
 			defer p.sem.Release()
+			// Each job gets its own request lifecycle. Timing/timeout jobs
+			// must not share a context: a shared one would let the first
+			// finisher cancel every still-in-flight timing probe.
 			requestCtx := ctx
 			if j.Timeout {
-				requestCtx = timingCtx
+				reqCtx, reqCancel := context.WithTimeout(ctx, p.client.Timeout)
+				defer reqCancel()
+				requestCtx = reqCtx
 			}
 			res := Do(requestCtx, p.client, j)
-			if j.Timeout {
-				cancelTiming()
-			}
 			onResult(res)
 		}()
 	}
