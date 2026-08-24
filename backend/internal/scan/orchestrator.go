@@ -20,10 +20,18 @@ import (
 
 type Orchestrator struct {
 	Cfg       config.Config
-	Store     *store.Store
+	Store     ScanStore
 	Hub       *ws.Hub
 	Guard     *Guard
 	Canceller *Canceller
+}
+
+// ScanStore is the subset of store operations the orchestrator depends on.
+// Defining it as an interface lets tests substitute a failing store to
+// verify that task summaries never count findings that were not persisted.
+type ScanStore interface {
+	InsertFinding(f model.Finding) error
+	UpdateTask(t model.Task) error
 }
 
 func NewOrchestrator(cfg config.Config, st *store.Store, hub *ws.Hub) *Orchestrator {
@@ -125,11 +133,11 @@ func (o *Orchestrator) run(ctx context.Context, task model.Task, spec []byte) {
 			return
 		}
 		f := fingerprint.FindingOf(task.ID, probe, hit, uuid.NewString(), clock.NowString())
-		_, _, hits = prog.AddHit(f.Severity.Rank())
 		if err := o.Store.InsertFinding(f); err != nil {
 			logger.L().Error("insert finding", "err", err.Error())
 			return
 		}
+		_, _, hits = prog.AddHit(f.Severity.Rank())
 		o.Hub.Broadcast(task.ID, model.StreamEvent{
 			Type: model.EventFinding, TS: clock.NowString(), TaskID: task.ID, Finding: &f, Hits: hits, Sent: sent, Total: total,
 		})
